@@ -120,8 +120,16 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ----- CORS (React frontend) -----
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 # Allow X-API-Key header in cross-origin requests (required for API key auth).
 CORS_ALLOW_HEADERS = [
     "accept",
@@ -133,4 +141,13 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "x-api-key",
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://api.point-iq.app",
+    "https://www.api.point-iq.app",
+    "http://api.point-iq.app",
+    "http://www.api.point-iq.app",
 ]
