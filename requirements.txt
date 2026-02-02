@@ -10,3 +10,4 @@ Pillow
 PyJWT
 django-ratelimit
 python-dateutil
+gunicorn
