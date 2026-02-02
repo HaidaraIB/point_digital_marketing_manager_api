@@ -150,4 +150,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.api.point-iq.app",
     "http://api.point-iq.app",
     "http://www.api.point-iq.app",
+    "https://acc.point-iq.app",
+    "https://www.acc.point-iq.app",
+    "http://acc.point-iq.app",
+    "http://www.acc.point-iq.app",
 ]
