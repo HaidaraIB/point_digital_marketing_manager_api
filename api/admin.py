@@ -1,12 +1,15 @@
 """
 Admin for Point Digital Marketing Manager API.
+All models are registered so they appear in the admin panel.
 """
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User,
+    ServiceDefinition,
     AgencySettings,
     AgencySettingsService,
+    ServiceItem,
     Quotation,
     QuotationItem,
     Voucher,
@@ -26,6 +29,12 @@ class UserAdmin(BaseUserAdmin):
     )
 
 
+@admin.register(ServiceDefinition)
+class ServiceDefinitionAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "description")
+    search_fields = ("name",)
+
+
 class AgencySettingsServiceInline(admin.TabularInline):
     model = AgencySettingsService
     extra = 0
@@ -34,7 +43,22 @@ class AgencySettingsServiceInline(admin.TabularInline):
 @admin.register(AgencySettings)
 class AgencySettingsAdmin(admin.ModelAdmin):
     inlines = [AgencySettingsServiceInline]
-    list_display = ("name", "email", "phone")
+    list_display = ("id", "name", "email", "phone")
+    search_fields = ("name", "email")
+
+
+@admin.register(AgencySettingsService)
+class AgencySettingsServiceAdmin(admin.ModelAdmin):
+    list_display = ("id", "settings", "name", "description")
+    list_filter = ("settings",)
+    search_fields = ("name",)
+    raw_id_fields = ("settings",)
+
+
+@admin.register(ServiceItem)
+class ServiceItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "description", "price", "quantity")
+    search_fields = ("description",)
 
 
 class QuotationItemInline(admin.TabularInline):
@@ -47,12 +71,22 @@ class QuotationAdmin(admin.ModelAdmin):
     inlines = [QuotationItemInline]
     list_display = ("id", "client_name", "date", "total", "status")
     list_filter = ("status",)
+    search_fields = ("client_name",)
+
+
+@admin.register(QuotationItem)
+class QuotationItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "quotation", "description", "price", "quantity")
+    list_filter = ("quotation",)
+    search_fields = ("description",)
+    raw_id_fields = ("quotation",)
 
 
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
     list_display = ("id", "type", "amount", "date", "party_name")
     list_filter = ("type",)
+    search_fields = ("party_name", "description")
 
 
 class ContractClauseLinkInline(admin.TabularInline):
@@ -66,8 +100,18 @@ class ContractAdmin(admin.ModelAdmin):
     inlines = [ContractClauseLinkInline]
     list_display = ("id", "subject", "date", "total_value", "status")
     list_filter = ("status",)
+    search_fields = ("subject", "party_a_name", "party_b_name")
 
 
 @admin.register(ContractClause)
 class ContractClauseAdmin(admin.ModelAdmin):
     list_display = ("id", "title")
+    search_fields = ("title", "content")
+
+
+@admin.register(ContractClauseLink)
+class ContractClauseLinkAdmin(admin.ModelAdmin):
+    list_display = ("id", "contract", "clause", "order")
+    list_filter = ("contract",)
+    raw_id_fields = ("contract", "clause")
+    ordering = ("contract", "order")

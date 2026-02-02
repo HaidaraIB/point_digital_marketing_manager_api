@@ -40,7 +40,7 @@ class AgencySettings(models.Model):
     """Singleton-like agency settings (name, logo, address, services, quotation terms)."""
 
     name = models.CharField(max_length=255)
-    logo = models.URLField(max_length=500, blank=True)
+    logo = models.TextField(blank=True)  # URL or base64 data URL (for uploaded images)
     address = models.CharField(max_length=500, blank=True)
     phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
@@ -49,6 +49,7 @@ class AgencySettings(models.Model):
     class Meta:
         db_table = "api_agency_settings"
         verbose_name_plural = _("Agency settings")
+        ordering = ["id"]
 
     def __str__(self):
         return self.name
