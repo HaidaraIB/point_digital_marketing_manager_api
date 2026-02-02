@@ -1,11 +1,11 @@
 # نشر الـ API (Django) على Linux VPS
 
-مشروع Django REST API — يعمل عبر Gunicorn خلف Nginx.
+مشروع Django REST API — يعمل عبر Gunicorn خلف Nginx. ملفات لوحة الإدارة (admin) تُخدم من Nginx بعد جمعها بـ `collectstatic`.
 
 ## المتطلبات على السيرفر
 
 - **Python 3.10+**
-- **Nginx** (وكيل عكسي وخدمة ثابتة)
+- **Nginx** (وكيل عكسي + خدمة الملفات الثابتة)
 - **(اختياري)** PostgreSQL بدلاً من SQLite للإنتاج
 
 ---
@@ -86,15 +86,17 @@ python3 -c "import secrets; print(secrets.token_urlsafe(50))"
 
 ---
 
-## 6. قاعدة البيانات والهجرات
+## 6. قاعدة البيانات والهجرات وجمع الملفات الثابتة
 
 ```bash
 cd /var/www/point_digital_marketing_manager_api
 source .venv/bin/activate
 python manage.py migrate
 python manage.py createsuperuser   # إن احتجت مستخدماً للوحة الإدارة
-python manage.py collectstatic --noinput   # إن كان لديك ملفات static
+python manage.py collectstatic --noinput   # مطلوب لعرض لوحة الإدارة (admin) بشكل صحيح
 ```
+
+**مهم:** `collectstatic` ينسخ CSS/JS لوحة الإدارة إلى `staticfiles/`. بدونها ستظهر صفحة `/admin/` بدون تنسيق (مربعات سوداء ونص عادي). Nginx يخدم هذه الملفات من مسار `/static/` (انظر الخطوة 9).
 
 ---
 
@@ -137,11 +139,13 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-إذا رفعت المشروع كمستخدم آخر (مثلاً `deploy`) استبدل `User=www-data` و `Group=www-data` به، وتأكد أن ملكية المجلد مناسبة:
+**مهم:** الخدمة تعمل بالمستخدم `www-data` ويجب أن يكون له حق الكتابة في مجلد المشروع لإنشاء `gunicorn.sock`. نفّذ قبل تشغيل الخدمة:
 
 ```bash
 sudo chown -R www-data:www-data /var/www/point_digital_marketing_manager_api
 ```
+
+إذا رفعت المشروع كمستخدم آخر (مثلاً `deploy`) استبدل `User=www-data` و `Group=www-data` به، واستخدم نفس المستخدم في أمر `chown`.
 
 تفعيل وتشغيل الخدمة:
 
@@ -154,7 +158,9 @@ sudo systemctl status point_digital_marketing_manager_api
 
 ---
 
-## 9. إعداد Nginx كوكيل عكسي للـ API
+## 9. إعداد Nginx: وكيل عكسي + الملفات الثابتة (لوحة الإدارة)
+
+Gunicorn لا يخدم الملفات الثابتة. يجب أن يخدم Nginx مسار `/static/` من مجلد `staticfiles/` حتى تظهر لوحة الإدارة (Django admin) بتنسيق صحيح.
 
 ```bash
 sudo nano /etc/nginx/sites-available/point_digital_marketing_manager_api
@@ -166,6 +172,11 @@ sudo nano /etc/nginx/sites-available/point_digital_marketing_manager_api
 server {
     listen 80;
     server_name api.yourdomain.com;
+
+    # ملفات ثابتة لوحة الإدارة (Django admin) — مطلوب لعرض CSS/JS بشكل صحيح
+    location /static/ {
+        alias /var/www/point_digital_marketing_manager_api/staticfiles/;
+    }
 
     location / {
         proxy_pass http://unix:/var/www/point_digital_marketing_manager_api/gunicorn.sock;
@@ -233,6 +244,7 @@ source .venv/bin/activate
 git pull   # إن كنت تستخدم Git
 pip install -r requirements.txt
 python manage.py migrate
+python manage.py collectstatic --noinput   # إن أضفت/عدّلت تطبيقات تستخدم ملفات ثابتة
 sudo systemctl restart point_digital_marketing_manager_api
 ```
 
@@ -243,8 +255,9 @@ sudo systemctl restart point_digital_marketing_manager_api
 | الملف/المتغير      | الوصف |
 |--------------------|--------|
 | `.env`             | `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `ALLOWED_API_KEYS` |
+| `staticfiles/`     | مخرجات `collectstatic` — يخدمها Nginx من `/static/` |
 | `gunicorn.sock`    | ملف Socket الذي ينشئه Gunicorn ويتصل به Nginx |
-| `point_digital_marketing_manager_api.service`  | خدمة systemd لتشغيل Gunicorn تلقائياً |
+| `point_digital_marketing_manager_api.service` | خدمة systemd لتشغيل Gunicorn تلقائياً |
 
 **التحقق من السجلات:**
 
@@ -257,3 +270,5 @@ sudo journalctl -u point_digital_marketing_manager_api -f
 ```bash
 sudo systemctl restart point_digital_marketing_manager_api
 ```
+
+**إذا ظهرت لوحة الإدارة بدون تنسيق (مربعات سوداء):** تأكد من تنفيذ `collectstatic` ووجود بلوك `location /static/` في تكوين Nginx كما في الخطوة 9.
