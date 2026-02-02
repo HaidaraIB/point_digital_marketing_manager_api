@@ -12,6 +12,7 @@ from .models import (
     Quotation,
     Voucher,
     Contract,
+    SMSLog,
 )
 from .serializers import (
     UserSerializer,
@@ -20,6 +21,7 @@ from .serializers import (
     QuotationSerializer,
     VoucherSerializer,
     ContractSerializer,
+    SMSLogSerializer,
 )
 from .permissions import IsAuthenticatedReadOnlyOrAdmin, IsAdminUser
 
@@ -94,8 +96,17 @@ class VoucherViewSet(viewsets.ModelViewSet):
 
 
 class ContractViewSet(viewsets.ModelViewSet):
-    """CRUD for contracts."""
+    """CRUD for contracts (v4: status ACTIVE/ARCHIVED)."""
 
     queryset = Contract.objects.all()
     permission_classes = [IsAuthenticated, IsAuthenticatedReadOnlyOrAdmin]
     serializer_class = ContractSerializer
+
+
+class SMSLogViewSet(viewsets.ModelViewSet):
+    """CRUD for SMS logs (v4). List/create for authenticated; delete for ADMIN."""
+
+    queryset = SMSLog.objects.all()
+    permission_classes = [IsAuthenticated, IsAuthenticatedReadOnlyOrAdmin]
+    serializer_class = SMSLogSerializer
+    http_method_names = ["get", "post", "delete", "head", "options"]

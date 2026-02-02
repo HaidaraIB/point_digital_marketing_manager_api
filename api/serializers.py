@@ -14,6 +14,7 @@ from .models import (
     Contract,
     ContractClause,
     ContractClauseLink,
+    SMSLog,
 )
 
 User = get_user_model()
@@ -90,6 +91,10 @@ class AgencySettingsSerializer(serializers.ModelSerializer):
     quotationTerms = serializers.ListField(
         child=serializers.CharField(), source="quotation_terms", required=False
     )
+    twilio = serializers.JSONField(required=False, default=dict)
+    exchangeRate = serializers.DecimalField(
+        max_digits=14, decimal_places=2, source="exchange_rate", required=False
+    )
 
     class Meta:
         model = AgencySettings
@@ -102,6 +107,8 @@ class AgencySettingsSerializer(serializers.ModelSerializer):
             "email",
             "services",
             "quotationTerms",
+            "twilio",
+            "exchangeRate",
         ]
 
     def to_representation(self, instance):
@@ -111,13 +118,20 @@ class AgencySettingsSerializer(serializers.ModelSerializer):
             for s in instance.services_fk.all().order_by("id")
         ]
         rep["quotationTerms"] = instance.quotation_terms or []
+        rep["twilio"] = instance.twilio or {}
+        rep["exchangeRate"] = float(instance.exchange_rate) if instance.exchange_rate else 1500
         return rep
 
     def create(self, validated_data):
         services_data = validated_data.pop("services", [])
         quotation_terms = validated_data.pop("quotation_terms", [])
+        exchange_rate = validated_data.pop("exchange_rate", 1500)
+        twilio = validated_data.pop("twilio", {})
         settings = AgencySettings.objects.create(
-            quotation_terms=quotation_terms, **validated_data
+            quotation_terms=quotation_terms,
+            exchange_rate=exchange_rate,
+            twilio=twilio,
+            **validated_data,
         )
         for s in services_data:
             AgencySettingsService.objects.create(settings=settings, **s)
@@ -128,8 +142,12 @@ class AgencySettingsSerializer(serializers.ModelSerializer):
         quotation_terms = validated_data.get("quotation_terms")
         if quotation_terms is not None:
             instance.quotation_terms = quotation_terms
+        if "exchange_rate" in validated_data:
+            instance.exchange_rate = validated_data.pop("exchange_rate")
+        if "twilio" in validated_data:
+            instance.twilio = validated_data.pop("twilio")
         for attr, value in validated_data.items():
-            if attr != "quotation_terms":
+            if attr not in ("quotation_terms", "exchange_rate", "twilio"):
                 setattr(instance, attr, value)
         instance.save()
         if services_data is not None:
@@ -142,21 +160,24 @@ class AgencySettingsSerializer(serializers.ModelSerializer):
 # ----- Quotation -----
 class QuotationItemSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
+    currency = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = QuotationItem
-        fields = ["id", "description", "price", "quantity"]
+        fields = ["id", "description", "price", "quantity", "currency"]
 
 
 class QuotationSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     clientName = serializers.CharField(source="client_name")
+    clientPhone = serializers.CharField(source="client_phone", required=False, allow_blank=True)
     items = QuotationItemSerializer(many=True, required=False)
+    currency = serializers.CharField(required=False, default="IQD")
     status = serializers.ChoiceField(choices=Quotation.Status.choices)
 
     class Meta:
         model = Quotation
-        fields = ["id", "clientName", "date", "items", "total", "status", "note"]
+        fields = ["id", "clientName", "clientPhone", "date", "items", "total", "currency", "status", "note"]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
@@ -166,9 +187,12 @@ class QuotationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         validated_data["client_name"] = validated_data.pop("client_name")
+        validated_data["client_phone"] = validated_data.pop("client_phone", "") or ""
+        validated_data.setdefault("currency", "IQD")
         quotation = Quotation.objects.create(**validated_data)
         total = 0
         for item in items_data:
+            item.setdefault("currency", "")
             qi = QuotationItem.objects.create(quotation=quotation, **item)
             total += float(qi.price) * qi.quantity
         quotation.total = total
@@ -179,12 +203,15 @@ class QuotationSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items", None)
         if "client_name" in validated_data:
             instance.client_name = validated_data.pop("client_name")
+        if "client_phone" in validated_data:
+            instance.client_phone = validated_data.pop("client_phone", "") or ""
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if items_data is not None:
             instance.items.all().delete()
             total = 0
             for item in items_data:
+                item.setdefault("currency", "")
                 qi = QuotationItem.objects.create(quotation=instance, **item)
                 total += float(qi.price) * qi.quantity
             instance.total = total
@@ -197,18 +224,26 @@ class VoucherSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     type = serializers.ChoiceField(choices=Voucher.VoucherType.choices)
     partyName = serializers.CharField(source="party_name")
+    partyPhone = serializers.CharField(source="party_phone", required=False, allow_blank=True)
+    currency = serializers.CharField(required=False, default="IQD")
+    category = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Voucher
-        fields = ["id", "type", "amount", "date", "description", "partyName"]
+        fields = ["id", "type", "amount", "currency", "date", "description", "partyName", "partyPhone", "category"]
 
     def create(self, validated_data):
         validated_data["party_name"] = validated_data.pop("party_name")
+        validated_data["party_phone"] = validated_data.pop("party_phone", "") or ""
+        validated_data.setdefault("currency", "IQD")
+        validated_data.setdefault("category", "")
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         if "party_name" in validated_data:
             instance.party_name = validated_data.pop("party_name")
+        if "party_phone" in validated_data:
+            instance.party_phone = validated_data.pop("party_phone", "") or ""
         return super().update(instance, validated_data)
 
 
@@ -230,7 +265,9 @@ class ContractSerializer(serializers.ModelSerializer):
     totalValue = serializers.DecimalField(
         max_digits=14, decimal_places=2, source="total_value"
     )
+    currency = serializers.CharField(required=False, default="IQD")
     clauses = ContractClauseSerializer(many=True, required=False)
+    status = serializers.ChoiceField(choices=Contract.Status.choices)
 
     class Meta:
         model = Contract
@@ -243,6 +280,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "partyBTitle",
             "subject",
             "totalValue",
+            "currency",
             "clauses",
             "status",
         ]
@@ -262,6 +300,7 @@ class ContractSerializer(serializers.ModelSerializer):
         validated_data["party_b_name"] = validated_data.pop("party_b_name")
         validated_data["party_b_title"] = validated_data.pop("party_b_title", "") or ""
         validated_data["total_value"] = validated_data.pop("total_value")
+        validated_data.setdefault("currency", "IQD")
         contract = Contract.objects.create(**validated_data)
         for i, c in enumerate(clauses_data):
             clause = ContractClause.objects.create(**c)
@@ -270,7 +309,7 @@ class ContractSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         clauses_data = validated_data.pop("clauses", None)
-        for k in ("party_a_name", "party_a_title", "party_b_name", "party_b_title", "total_value"):
+        for k in ("party_a_name", "party_a_title", "party_b_name", "party_b_title", "total_value", "currency"):
             if k in validated_data:
                 setattr(instance, k, validated_data.pop(k))
         for attr, value in validated_data.items():
@@ -284,3 +323,13 @@ class ContractSerializer(serializers.ModelSerializer):
                 ContractClauseLink.objects.create(contract=instance, clause=clause, order=i)
         instance.save()
         return instance
+
+
+# ----- SMS Log -----
+class SMSLogSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    timestamp = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S", read_only=True)
+
+    class Meta:
+        model = SMSLog
+        fields = ["id", "to", "body", "status", "timestamp", "error"]

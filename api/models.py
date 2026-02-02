@@ -37,7 +37,7 @@ class ServiceDefinition(models.Model):
 
 
 class AgencySettings(models.Model):
-    """Singleton-like agency settings (name, logo, address, services, quotation terms)."""
+    """Singleton-like agency settings (v4: + twilio, exchange_rate)."""
 
     name = models.CharField(max_length=255)
     logo = models.TextField(blank=True)  # URL or base64 data URL (for uploaded images)
@@ -45,6 +45,8 @@ class AgencySettings(models.Model):
     phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     quotation_terms = models.JSONField(default=list)  # list of strings
+    twilio = models.JSONField(default=dict, blank=True)  # { accountSid, authToken, fromNumber, senderName, isEnabled }
+    exchange_rate = models.DecimalField(max_digits=14, decimal_places=2, default=1500)
 
     class Meta:
         db_table = "api_agency_settings"
@@ -79,7 +81,7 @@ class ServiceItem(models.Model):
 
 
 class Quotation(models.Model):
-    """Quotation: client, date, items, total, status, note."""
+    """Quotation: client, date, items, total, status, note (v4: client_phone, currency)."""
 
     class Status(models.TextChoices):
         PENDING = "PENDING", _("Pending")
@@ -88,8 +90,10 @@ class Quotation(models.Model):
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     client_name = models.CharField(max_length=255)
+    client_phone = models.CharField(max_length=50, blank=True)
     date = models.CharField(max_length=50)  # frontend uses locale date string
     total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    currency = models.CharField(max_length=3, default="IQD")  # IQD / USD
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -100,31 +104,41 @@ class Quotation(models.Model):
 
 
 class QuotationItem(models.Model):
-    """Quotation line item linked to a quotation."""
+    """Quotation line item linked to a quotation (v4: optional currency)."""
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name="items")
     description = models.TextField()
     price = models.DecimalField(max_digits=14, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
+    currency = models.CharField(max_length=3, blank=True, default="")
 
     class Meta:
         db_table = "api_quotation_item"
 
 
 class Voucher(models.Model):
-    """Voucher: type (RECEIPT/EXPENDITURE), amount, date, description, party_name."""
+    """Voucher (v4): type RECEIPT/PAYMENT, currency, party_phone, category."""
 
     class VoucherType(models.TextChoices):
         RECEIPT = "RECEIPT", _("قبض")
-        EXPENDITURE = "EXPENDITURE", _("صرف")
+        PAYMENT = "PAYMENT", _("صرف")
+
+    class Category(models.TextChoices):
+        SALARY = "SALARY", _("راتب")
+        DAILY = "DAILY", _("يومي")
+        GENERAL = "GENERAL", _("عام")
+        VOUCHER = "VOUCHER", _("وصل")
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     type = models.CharField(max_length=20, choices=VoucherType.choices)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=3, default="IQD")
     date = models.CharField(max_length=50)
     description = models.TextField(blank=True)
     party_name = models.CharField(max_length=255)
+    party_phone = models.CharField(max_length=50, blank=True)
+    category = models.CharField(max_length=20, choices=Category.choices, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -144,12 +158,11 @@ class ContractClause(models.Model):
 
 
 class Contract(models.Model):
-    """Contract: parties, subject, value, clauses, status."""
+    """Contract (v4): status ACTIVE/ARCHIVED, currency."""
 
     class Status(models.TextChoices):
         ACTIVE = "ACTIVE", _("Active")
-        EXPIRED = "EXPIRED", _("Expired")
-        DRAFT = "DRAFT", _("Draft")
+        ARCHIVED = "ARCHIVED", _("Archived")
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     date = models.CharField(max_length=50)
@@ -159,7 +172,8 @@ class Contract(models.Model):
     party_b_title = models.CharField(max_length=255, blank=True)
     subject = models.CharField(max_length=500)
     total_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    currency = models.CharField(max_length=3, default="IQD")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -177,3 +191,22 @@ class ContractClauseLink(models.Model):
     class Meta:
         db_table = "api_contract_clause_link"
         ordering = ["order"]
+
+
+class SMSLog(models.Model):
+    """SMS log (v4): to, body, status, timestamp, error."""
+
+    class LogStatus(models.TextChoices):
+        SUCCESS = "SUCCESS", _("Success")
+        FAILED = "FAILED", _("Failed")
+
+    id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
+    to = models.CharField(max_length=50)
+    body = models.TextField()
+    status = models.CharField(max_length=20, choices=LogStatus.choices)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "api_sms_log"
+        ordering = ["-timestamp"]

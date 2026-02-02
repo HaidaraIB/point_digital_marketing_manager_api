@@ -35,23 +35,26 @@ python manage.py runserver
 
 ## Endpoints
 
-| Resource    | Path              | Auth   |
-|------------|-------------------|--------|
-| Users      | `/api/users/`     | JWT    |
-| Me         | `/api/users/me/`  | JWT    |
-| Settings   | `/api/settings/`  | JWT    |
-| Quotations | `/api/quotations/`| JWT    |
-| Vouchers   | `/api/vouchers/`  | JWT    |
-| Contracts  | `/api/contracts/` | JWT    |
+| Resource    | Path               | Auth   |
+|------------|--------------------|--------|
+| Users      | `/api/users/`      | JWT    |
+| Me         | `/api/users/me/`   | JWT    |
+| Settings   | `/api/settings/`   | JWT    |
+| Quotations | `/api/quotations/` | JWT    |
+| Vouchers   | `/api/vouchers/`   | JWT    |
+| Contracts  | `/api/contracts/`  | JWT    |
+| SMS Logs   | `/api/sms-logs/`   | JWT    |
+
+This API is built for the **point-digital-marketing-manager-4** frontend (v4). It supports currency (IQD/USD), Twilio settings, exchange rate, quotation/voucher phone fields, voucher categories, contract status ACTIVE/ARCHIVED, and SMS log storage.
 
 Write (create/update/delete) is restricted to users with role **ADMIN** for users and settings; other resources allow authenticated users to write.
 
-## Connect React frontend
+## Connect React frontend (v4)
 
-In the React project root, create `.env`:
+In the **point-digital-marketing-manager-4** project root, create `.env` or `.env.local`:
 
 ```
 VITE_API_URL=http://localhost:8000
 ```
 
-Then run the frontend (`npm run dev`) and log in with the Django user credentials.
+Then run the frontend (`npm run dev`) and log in with the Django user credentials. If `VITE_API_URL` is not set, the app runs in local-only mode (localStorage).

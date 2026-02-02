@@ -16,6 +16,7 @@ from .models import (
     Contract,
     ContractClause,
     ContractClauseLink,
+    SMSLog,
 )
 
 
@@ -115,3 +116,11 @@ class ContractClauseLinkAdmin(admin.ModelAdmin):
     list_filter = ("contract",)
     raw_id_fields = ("contract", "clause")
     ordering = ("contract", "order")
+
+
+@admin.register(SMSLog)
+class SMSLogAdmin(admin.ModelAdmin):
+    list_display = ("id", "to", "status", "timestamp")
+    list_filter = ("status",)
+    search_fields = ("to", "body")
+    readonly_fields = ("timestamp",)

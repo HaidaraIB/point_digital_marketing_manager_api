@@ -10,6 +10,7 @@ from .views import (
     QuotationViewSet,
     VoucherViewSet,
     ContractViewSet,
+    SMSLogViewSet,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r"settings", AgencySettingsViewSet, basename="agencysettings")
 router.register(r"quotations", QuotationViewSet, basename="quotation")
 router.register(r"vouchers", VoucherViewSet, basename="voucher")
 router.register(r"contracts", ContractViewSet, basename="contract")
+router.register(r"sms-logs", SMSLogViewSet, basename="smslog")
 
 urlpatterns = [
     path("", include(router.urls)),
