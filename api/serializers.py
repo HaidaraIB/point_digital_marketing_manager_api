@@ -1,0 +1,286 @@
+"""
+Serializers for Point Digital Marketing Manager API.
+Output format matches frontend types (camelCase handled via to_representation where needed).
+"""
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
+from .models import (
+    AgencySettings,
+    AgencySettingsService,
+    Quotation,
+    QuotationItem,
+    Voucher,
+    Contract,
+    ContractClause,
+    ContractClauseLink,
+)
+
+User = get_user_model()
+
+
+# ----- User -----
+class UserSerializer(serializers.ModelSerializer):
+    """User serializer; id as string, role as enum string."""
+
+    id = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    createdAt = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "name", "username", "role", "createdAt"]
+        read_only_fields = ["id", "username", "createdAt"]
+        extra_kwargs = {"password": {"write_only": True}}
+
+    def get_id(self, obj):
+        return str(obj.pk)
+
+    def get_name(self, obj):
+        return obj.get_full_name() or obj.username
+
+    def get_createdAt(self, obj):
+        return obj.date_joined.strftime("%Y-%m-%d") if obj.date_joined else ""
+
+    def update(self, instance, validated_data):
+        name = validated_data.pop("name", None)
+        if name is not None:
+            parts = (name or "").strip().split(None, 1)
+            instance.first_name = parts[0] if parts else ""
+            instance.last_name = parts[1] if len(parts) > 1 else ""
+        password = validated_data.pop("password", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
+
+
+class UserCreateSerializer(serializers.ModelSerializer):
+    """Create user with name (first_name used as display name)."""
+
+    name = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+
+    class Meta:
+        model = User
+        fields = ["name", "username", "password", "role"]
+
+    def create(self, validated_data):
+        name = validated_data.pop("name", "")
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        parts = name.strip().split(None, 1)
+        user.first_name = parts[0] if parts else ""
+        user.last_name = parts[1] if len(parts) > 1 else ""
+        user.save()
+        return user
+
+
+# ----- Agency Settings -----
+class ServiceDefinitionSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    description = serializers.CharField(required=False, allow_blank=True)
+
+
+class AgencySettingsSerializer(serializers.ModelSerializer):
+    services = ServiceDefinitionSerializer(many=True, required=False)
+    quotationTerms = serializers.ListField(
+        child=serializers.CharField(), source="quotation_terms", required=False
+    )
+
+    class Meta:
+        model = AgencySettings
+        fields = [
+            "id",
+            "name",
+            "logo",
+            "address",
+            "phone",
+            "email",
+            "services",
+            "quotationTerms",
+        ]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["services"] = [
+            {"name": s.name, "description": s.description or ""}
+            for s in instance.services_fk.all().order_by("id")
+        ]
+        rep["quotationTerms"] = instance.quotation_terms or []
+        return rep
+
+    def create(self, validated_data):
+        services_data = validated_data.pop("services", [])
+        quotation_terms = validated_data.pop("quotation_terms", [])
+        settings = AgencySettings.objects.create(
+            quotation_terms=quotation_terms, **validated_data
+        )
+        for s in services_data:
+            AgencySettingsService.objects.create(settings=settings, **s)
+        return settings
+
+    def update(self, instance, validated_data):
+        services_data = validated_data.pop("services", None)
+        quotation_terms = validated_data.get("quotation_terms")
+        if quotation_terms is not None:
+            instance.quotation_terms = quotation_terms
+        for attr, value in validated_data.items():
+            if attr != "quotation_terms":
+                setattr(instance, attr, value)
+        instance.save()
+        if services_data is not None:
+            instance.services_fk.all().delete()
+            for s in services_data:
+                AgencySettingsService.objects.create(settings=instance, **s)
+        return instance
+
+
+# ----- Quotation -----
+class QuotationItemSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = QuotationItem
+        fields = ["id", "description", "price", "quantity"]
+
+
+class QuotationSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    clientName = serializers.CharField(source="client_name")
+    items = QuotationItemSerializer(many=True, required=False)
+    status = serializers.ChoiceField(choices=Quotation.Status.choices)
+
+    class Meta:
+        model = Quotation
+        fields = ["id", "clientName", "date", "items", "total", "status", "note"]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["items"] = QuotationItemSerializer(instance.items.all().order_by("id"), many=True).data
+        return rep
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items", [])
+        validated_data["client_name"] = validated_data.pop("client_name")
+        quotation = Quotation.objects.create(**validated_data)
+        total = 0
+        for item in items_data:
+            qi = QuotationItem.objects.create(quotation=quotation, **item)
+            total += float(qi.price) * qi.quantity
+        quotation.total = total
+        quotation.save()
+        return quotation
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", None)
+        if "client_name" in validated_data:
+            instance.client_name = validated_data.pop("client_name")
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if items_data is not None:
+            instance.items.all().delete()
+            total = 0
+            for item in items_data:
+                qi = QuotationItem.objects.create(quotation=instance, **item)
+                total += float(qi.price) * qi.quantity
+            instance.total = total
+        instance.save()
+        return instance
+
+
+# ----- Voucher -----
+class VoucherSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    type = serializers.ChoiceField(choices=Voucher.VoucherType.choices)
+    partyName = serializers.CharField(source="party_name")
+
+    class Meta:
+        model = Voucher
+        fields = ["id", "type", "amount", "date", "description", "partyName"]
+
+    def create(self, validated_data):
+        validated_data["party_name"] = validated_data.pop("party_name")
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if "party_name" in validated_data:
+            instance.party_name = validated_data.pop("party_name")
+        return super().update(instance, validated_data)
+
+
+# ----- Contract -----
+class ContractClauseSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = ContractClause
+        fields = ["id", "title", "content"]
+
+
+class ContractSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    partyAName = serializers.CharField(source="party_a_name")
+    partyATitle = serializers.CharField(source="party_a_title", required=False, allow_blank=True)
+    partyBName = serializers.CharField(source="party_b_name")
+    partyBTitle = serializers.CharField(source="party_b_title", required=False, allow_blank=True)
+    totalValue = serializers.DecimalField(
+        max_digits=14, decimal_places=2, source="total_value"
+    )
+    clauses = ContractClauseSerializer(many=True, required=False)
+
+    class Meta:
+        model = Contract
+        fields = [
+            "id",
+            "date",
+            "partyAName",
+            "partyATitle",
+            "partyBName",
+            "partyBTitle",
+            "subject",
+            "totalValue",
+            "clauses",
+            "status",
+        ]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        links = instance.clause_links.all().order_by("order")
+        rep["clauses"] = [
+            ContractClauseSerializer(link.clause).data for link in links
+        ]
+        return rep
+
+    def create(self, validated_data):
+        clauses_data = validated_data.pop("clauses", [])
+        validated_data["party_a_name"] = validated_data.pop("party_a_name")
+        validated_data["party_a_title"] = validated_data.pop("party_a_title", "") or ""
+        validated_data["party_b_name"] = validated_data.pop("party_b_name")
+        validated_data["party_b_title"] = validated_data.pop("party_b_title", "") or ""
+        validated_data["total_value"] = validated_data.pop("total_value")
+        contract = Contract.objects.create(**validated_data)
+        for i, c in enumerate(clauses_data):
+            clause = ContractClause.objects.create(**c)
+            ContractClauseLink.objects.create(contract=contract, clause=clause, order=i)
+        return contract
+
+    def update(self, instance, validated_data):
+        clauses_data = validated_data.pop("clauses", None)
+        for k in ("party_a_name", "party_a_title", "party_b_name", "party_b_title", "total_value"):
+            if k in validated_data:
+                setattr(instance, k, validated_data.pop(k))
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if clauses_data is not None:
+            for link in instance.clause_links.all():
+                link.clause.delete()
+            instance.clause_links.all().delete()
+            for i, c in enumerate(clauses_data):
+                clause = ContractClause.objects.create(**c)
+                ContractClauseLink.objects.create(contract=instance, clause=clause, order=i)
+        instance.save()
+        return instance
