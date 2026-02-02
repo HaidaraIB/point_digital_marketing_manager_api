@@ -24,16 +24,16 @@ sudo apt-get install -y python3 python3-pip python3-venv nginx
 ```bash
 # مثال باستخدام rsync من جهازك
 rsync -avz --exclude __pycache__ --exclude "*.pyc" --exclude .env --exclude db.sqlite3 \
-  /path/to/point_digital_marketing_manager_api/ user@your-vps-ip:/var/www/pm4-api/
+  /path/to/point_digital_marketing_manager_api/ user@your-vps-ip:/var/www/point_digital_marketing_manager_api/
 ```
 
 أو عبر Git:
 
 ```bash
-sudo mkdir -p /var/www/pm4-api
-sudo chown $USER:$USER /var/www/pm4-api
-git clone <your-repo-url> /var/www/pm4-api
-cd /var/www/pm4-api
+sudo mkdir -p /var/www/point_digital_marketing_manager_api
+sudo chown $USER:$USER /var/www/point_digital_marketing_manager_api
+git clone <your-repo-url> /var/www/point_digital_marketing_manager_api
+cd /var/www/point_digital_marketing_manager_api
 ```
 
 ---
@@ -41,9 +41,9 @@ cd /var/www/pm4-api
 ## 3. البيئة الافتراضية واعتماديات Python
 
 ```bash
-cd /var/www/pm4-api
-python3 -m venv venv
-source venv/bin/activate
+cd /var/www/point_digital_marketing_manager_api
+python3 -m venv .venv
+source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
@@ -53,7 +53,7 @@ pip install -r requirements.txt
 ## 4. ملف البيئة (.env) على السيرفر
 
 ```bash
-nano /var/www/pm4-api/.env
+nano /var/www/point_digital_marketing_manager_api/.env
 ```
 
 محتوى مقترح (عدّل القيم):
@@ -89,8 +89,8 @@ python3 -c "import secrets; print(secrets.token_urlsafe(50))"
 ## 6. قاعدة البيانات والهجرات
 
 ```bash
-cd /var/www/pm4-api
-source venv/bin/activate
+cd /var/www/point_digital_marketing_manager_api
+source .venv/bin/activate
 python manage.py migrate
 python manage.py createsuperuser   # إن احتجت مستخدماً للوحة الإدارة
 python manage.py collectstatic --noinput   # إن كان لديك ملفات static
@@ -101,8 +101,8 @@ python manage.py collectstatic --noinput   # إن كان لديك ملفات sta
 ## 7. تشغيل Gunicorn (اختبار سريع)
 
 ```bash
-cd /var/www/pm4-api
-source venv/bin/activate
+cd /var/www/point_digital_marketing_manager_api
+source .venv/bin/activate
 gunicorn --bind 0.0.0.0:8000 point_digital_marketing_manager_api.wsgi:application
 ```
 
@@ -113,7 +113,7 @@ gunicorn --bind 0.0.0.0:8000 point_digital_marketing_manager_api.wsgi:applicatio
 ## 8. خدمة systemd لتشغيل الـ API دائماً
 
 ```bash
-sudo nano /etc/systemd/system/pm4-api.service
+sudo nano /etc/systemd/system/point_digital_marketing_manager_api.service
 ```
 
 المحتوى:
@@ -126,9 +126,9 @@ After=network.target
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/pm4-api
-Environment="PATH=/var/www/pm4-api/venv/bin"
-ExecStart=/var/www/pm4-api/venv/bin/gunicorn --workers 3 --bind unix:/var/www/pm4-api/gunicorn.sock point_digital_marketing_manager_api.wsgi:application
+WorkingDirectory=/var/www/point_digital_marketing_manager_api
+Environment="PATH=/var/www/point_digital_marketing_manager_api/.venv/bin"
+ExecStart=/var/www/point_digital_marketing_manager_api/.venv/bin/gunicorn --workers 3 --bind unix:/var/www/point_digital_marketing_manager_api/gunicorn.sock point_digital_marketing_manager_api.wsgi:application
 
 Restart=always
 RestartSec=3
@@ -140,16 +140,16 @@ WantedBy=multi-user.target
 إذا رفعت المشروع كمستخدم آخر (مثلاً `deploy`) استبدل `User=www-data` و `Group=www-data` به، وتأكد أن ملكية المجلد مناسبة:
 
 ```bash
-sudo chown -R www-data:www-data /var/www/pm4-api
+sudo chown -R www-data:www-data /var/www/point_digital_marketing_manager_api
 ```
 
 تفعيل وتشغيل الخدمة:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable pm4-api
-sudo systemctl start pm4-api
-sudo systemctl status pm4-api
+sudo systemctl enable point_digital_marketing_manager_api
+sudo systemctl start point_digital_marketing_manager_api
+sudo systemctl status point_digital_marketing_manager_api
 ```
 
 ---
@@ -157,7 +157,7 @@ sudo systemctl status pm4-api
 ## 9. إعداد Nginx كوكيل عكسي للـ API
 
 ```bash
-sudo nano /etc/nginx/sites-available/pm4-api
+sudo nano /etc/nginx/sites-available/point_digital_marketing_manager_api
 ```
 
 المحتوى (استبدل `api.yourdomain.com`):
@@ -168,7 +168,7 @@ server {
     server_name api.yourdomain.com;
 
     location / {
-        proxy_pass http://unix:/var/www/pm4-api/gunicorn.sock;
+        proxy_pass http://unix:/var/www/point_digital_marketing_manager_api/gunicorn.sock;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -184,7 +184,7 @@ server {
 تفعيل واختبار:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/pm4-api /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/point_digital_marketing_manager_api /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -228,12 +228,12 @@ CORS_ALLOW_HEADERS = [
 ## 12. تحديث الـ API لاحقاً
 
 ```bash
-cd /var/www/pm4-api
-source venv/bin/activate
+cd /var/www/point_digital_marketing_manager_api
+source .venv/bin/activate
 git pull   # إن كنت تستخدم Git
 pip install -r requirements.txt
 python manage.py migrate
-sudo systemctl restart pm4-api
+sudo systemctl restart point_digital_marketing_manager_api
 ```
 
 ---
@@ -244,16 +244,16 @@ sudo systemctl restart pm4-api
 |--------------------|--------|
 | `.env`             | `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `ALLOWED_API_KEYS` |
 | `gunicorn.sock`    | ملف Socket الذي ينشئه Gunicorn ويتصل به Nginx |
-| `pm4-api.service`  | خدمة systemd لتشغيل Gunicorn تلقائياً |
+| `point_digital_marketing_manager_api.service`  | خدمة systemd لتشغيل Gunicorn تلقائياً |
 
 **التحقق من السجلات:**
 
 ```bash
-sudo journalctl -u pm4-api -f
+sudo journalctl -u point_digital_marketing_manager_api -f
 ```
 
 **إعادة تشغيل الـ API:**
 
 ```bash
-sudo systemctl restart pm4-api
+sudo systemctl restart point_digital_marketing_manager_api
 ```
