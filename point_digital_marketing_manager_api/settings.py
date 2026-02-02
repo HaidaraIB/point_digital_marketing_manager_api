@@ -3,8 +3,12 @@ Django settings for point_digital_marketing_manager_api project.
 """
 from pathlib import Path
 from datetime import timedelta
+import os
+
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = "django-insecure-w)59*v0^j)tmqvhsnjg+u1&%5@+=ngix3sa7@iq+nlddn@3ut#"
 DEBUG = True
@@ -24,11 +28,16 @@ INSTALLED_APPS = [
     "api",
 ]
 
+# ----- API Keys (from .env) -----
+# Comma-separated list of keys allowed to call this API (each client app has one).
+ALLOWED_API_KEYS = os.getenv("ALLOWED_API_KEYS", "")
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "api.middleware.ApiKeyMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -109,3 +118,15 @@ SPECTACULAR_SETTINGS = {
 # ----- CORS (React frontend) -----
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+# Allow X-API-Key header in cross-origin requests (required for API key auth).
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-api-key",
+]
