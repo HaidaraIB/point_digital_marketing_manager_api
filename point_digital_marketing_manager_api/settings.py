@@ -1,6 +1,7 @@
 """
 Django settings for point_digital_marketing_manager_api project.
 """
+
 from pathlib import Path
 from datetime import timedelta
 import os
@@ -11,8 +12,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+DEBUG = os.getenv("DEBUG").lower() in ("true", "1", "yes")
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS").split(",") if h.strip()]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -30,7 +31,7 @@ INSTALLED_APPS = [
 
 # ----- API Keys (from .env) -----
 # Comma-separated list of keys allowed to call this API (each client app has one).
-ALLOWED_API_KEYS = os.getenv("ALLOWED_API_KEYS", "")
+ALLOWED_API_KEYS = os.getenv("ALLOWED_API_KEYS")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -72,7 +73,9 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
