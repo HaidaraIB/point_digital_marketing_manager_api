@@ -166,18 +166,27 @@ def send_sms(request):
     account_sid = (twilio_config.get("accountSid") or twilio_config.get("account_sid") or "").strip()
     auth_token = (twilio_config.get("authToken") or twilio_config.get("auth_token") or "").strip()
     from_number = (twilio_config.get("fromNumber") or twilio_config.get("from_number") or "").strip()
-    if not account_sid or not auth_token or not from_number:
+    sender_name = (twilio_config.get("senderName") or twilio_config.get("sender_name") or "").strip()
+    # يمكن استخدام رقم المرسل أو Sender ID (اسم المرسل) فقط
+    from_value = from_number if from_number else sender_name
+    if not account_sid or not auth_token:
         missing = []
         if not account_sid:
             missing.append("Account SID")
         if not auth_token:
             missing.append("Auth Token")
-        if not from_number:
-            missing.append("رقم المرسل")
         return Response(
             {
                 "success": False,
                 "error": "بيانات Twilio ناقصة: " + "، ".join(missing) + ". ادخلها من الإعدادات > ربط إشعارات SMS (Twilio) واحفظ الصفحة."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not from_value:
+        return Response(
+            {
+                "success": False,
+                "error": "يجب إدخال رقم المرسل أو اسم المرسل (Sender ID) في الإعدادات. يمكنك ترك رقم المرسل فارغاً واستخدام اسم المرسل فقط."
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
@@ -189,7 +198,7 @@ def send_sms(request):
     try:
         from twilio.rest import Client
         client = Client(account_sid, auth_token)
-        message = client.messages.create(body=body, from_=from_number, to=to)
+        message = client.messages.create(body=body, from_=from_value, to=to)
         if message.sid:
             return Response({"success": True})
         return Response(
@@ -205,6 +214,8 @@ def send_sms(request):
             err_msg = "حساب Twilio غير نشط. فعّل الحساب من لوحة Twilio (Console) أو استخدم حساباً آخر. تفاصيل: https://www.twilio.com/docs/errors/90010"
         elif "authenticate" in err_msg.lower() or "20003" in err_msg:
             err_msg = "بيانات Twilio غير صحيحة (Account SID أو Auth Token). تحقق من الإعدادات."
+        elif "21606" in err_msg or ("not a valid message-capable" in err_msg and "From" in err_msg):
+            err_msg = "اسم المرسل (Sender ID) غير مدعوم لهذا البلد. استخدم «رقم المرسل» في الإعدادات بدلاً من الاعتماد على الاسم فقط، أو راجع: https://www.twilio.com/docs/errors/21606"
         elif "21211" in err_msg or "invalid" in err_msg.lower() and "to" in err_msg.lower():
             err_msg = "رقم المستلم غير صالح. استخدم صيغة دولية مثل +9647xxxxxxxx"
         return Response(
