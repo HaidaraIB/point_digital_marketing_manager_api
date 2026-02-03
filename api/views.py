@@ -2,7 +2,7 @@
 ViewSets for Point Digital Marketing Manager API.
 """
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
@@ -133,3 +133,81 @@ class SMSLogViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAccountantReadAddOrAdmin]
     serializer_class = SMSLogSerializer
     http_method_names = ["get", "post", "delete", "head", "options"]
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def send_sms(request):
+    """
+    Send SMS via Twilio using agency settings. Body: { "to": "+964...", "body": "text" }.
+    Credentials stay on server; avoids CORS and client exposure.
+    """
+    to = (request.data.get("to") or "").strip()
+    body = (request.data.get("body") or "").strip()
+    if not to or not body:
+        return Response(
+            {"success": False, "error": "يجب تحديد رقم المستلم ونص الرسالة."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    settings_obj = AgencySettings.objects.first()
+    if not settings_obj or not settings_obj.twilio:
+        return Response(
+            {"success": False, "error": "إعدادات Twilio غير متوفرة. احفظ الإعدادات من صفحة الإعدادات (مدير النظام) مع تفعيل ربط Twilio."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    twilio_config = settings_obj.twilio or {}
+    # دعم camelCase و snake_case
+    is_enabled = twilio_config.get("isEnabled", twilio_config.get("is_enabled", False))
+    if not is_enabled:
+        return Response(
+            {"success": False, "error": "إرسال الرسائل معطل في الإعدادات. فعّل «الربط مفعل» في الإعدادات."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    account_sid = (twilio_config.get("accountSid") or twilio_config.get("account_sid") or "").strip()
+    auth_token = (twilio_config.get("authToken") or twilio_config.get("auth_token") or "").strip()
+    from_number = (twilio_config.get("fromNumber") or twilio_config.get("from_number") or "").strip()
+    if not account_sid or not auth_token or not from_number:
+        missing = []
+        if not account_sid:
+            missing.append("Account SID")
+        if not auth_token:
+            missing.append("Auth Token")
+        if not from_number:
+            missing.append("رقم المرسل")
+        return Response(
+            {
+                "success": False,
+                "error": "بيانات Twilio ناقصة: " + "، ".join(missing) + ". ادخلها من الإعدادات > ربط إشعارات SMS (Twilio) واحفظ الصفحة."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # تنسيق رقم الهاتف
+    if to.startswith("07") and len(to) >= 10:
+        to = "+964" + to[1:]
+    elif not to.startswith("+"):
+        to = "+" + to
+    try:
+        from twilio.rest import Client
+        client = Client(account_sid, auth_token)
+        message = client.messages.create(body=body, from_=from_number, to=to)
+        if message.sid:
+            return Response({"success": True})
+        return Response(
+            {"success": False, "error": "لم يتم إرجاع معرف الرسالة من Twilio."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except Exception as e:
+        import re
+        err_msg = str(e)
+        err_msg = re.sub(r"\x1b\[[0-9;]*m", "", err_msg).strip()
+        # رسالة مبسطة للحالات الشائعة
+        if "inactive" in err_msg.lower() or "90010" in err_msg:
+            err_msg = "حساب Twilio غير نشط. فعّل الحساب من لوحة Twilio (Console) أو استخدم حساباً آخر. تفاصيل: https://www.twilio.com/docs/errors/90010"
+        elif "authenticate" in err_msg.lower() or "20003" in err_msg:
+            err_msg = "بيانات Twilio غير صحيحة (Account SID أو Auth Token). تحقق من الإعدادات."
+        elif "21211" in err_msg or "invalid" in err_msg.lower() and "to" in err_msg.lower():
+            err_msg = "رقم المستلم غير صالح. استخدم صيغة دولية مثل +9647xxxxxxxx"
+        return Response(
+            {"success": False, "error": err_msg},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )

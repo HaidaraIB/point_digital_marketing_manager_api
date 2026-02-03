@@ -11,6 +11,7 @@ from .views import (
     VoucherViewSet,
     ContractViewSet,
     SMSLogViewSet,
+    send_sms,
 )
 
 router = DefaultRouter()
@@ -22,5 +23,6 @@ router.register(r"contracts", ContractViewSet, basename="contract")
 router.register(r"sms-logs", SMSLogViewSet, basename="smslog")
 
 urlpatterns = [
+    path("send-sms/", send_sms),
     path("", include(router.urls)),
 ]
