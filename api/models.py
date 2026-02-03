@@ -129,6 +129,7 @@ class Voucher(models.Model):
         DAILY = "DAILY", _("يومي")
         GENERAL = "GENERAL", _("عام")
         VOUCHER = "VOUCHER", _("وصل")
+        OWNER_WITHDRAWAL = "OWNER_WITHDRAWAL", _("سحب مالك")
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     type = models.CharField(max_length=20, choices=VoucherType.choices)
