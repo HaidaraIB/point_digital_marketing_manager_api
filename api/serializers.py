@@ -5,6 +5,7 @@ Output format matches frontend types (camelCase handled via to_representation wh
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
+from .id_utils import get_next_id
 from .models import (
     AgencySettings,
     AgencySettingsService,
@@ -189,10 +190,13 @@ class QuotationSerializer(serializers.ModelSerializer):
         validated_data["client_name"] = validated_data.pop("client_name")
         validated_data["client_phone"] = validated_data.pop("client_phone", "") or ""
         validated_data.setdefault("currency", "IQD")
+        validated_data["id"] = get_next_id("QT", Quotation)
         quotation = Quotation.objects.create(**validated_data)
         total = 0
         for item in items_data:
+            item.pop("id", None)
             item.setdefault("currency", "")
+            item["id"] = get_next_id("QI", QuotationItem)
             qi = QuotationItem.objects.create(quotation=quotation, **item)
             total += float(qi.price) * qi.quantity
         quotation.total = total
@@ -211,7 +215,9 @@ class QuotationSerializer(serializers.ModelSerializer):
             instance.items.all().delete()
             total = 0
             for item in items_data:
+                item.pop("id", None)
                 item.setdefault("currency", "")
+                item["id"] = get_next_id("QI", QuotationItem)
                 qi = QuotationItem.objects.create(quotation=instance, **item)
                 total += float(qi.price) * qi.quantity
             instance.total = total
@@ -237,6 +243,7 @@ class VoucherSerializer(serializers.ModelSerializer):
         validated_data["party_phone"] = validated_data.pop("party_phone", "") or ""
         validated_data.setdefault("currency", "IQD")
         validated_data.setdefault("category", "")
+        validated_data["id"] = get_next_id("VC", Voucher)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -301,8 +308,12 @@ class ContractSerializer(serializers.ModelSerializer):
         validated_data["party_b_title"] = validated_data.pop("party_b_title", "") or ""
         validated_data["total_value"] = validated_data.pop("total_value")
         validated_data.setdefault("currency", "IQD")
+        validated_data["id"] = get_next_id("CN", Contract)
         contract = Contract.objects.create(**validated_data)
         for i, c in enumerate(clauses_data):
+            c = dict(c)
+            c.pop("id", None)
+            c["id"] = get_next_id("CL", ContractClause)
             clause = ContractClause.objects.create(**c)
             ContractClauseLink.objects.create(contract=contract, clause=clause, order=i)
         return contract
@@ -319,6 +330,9 @@ class ContractSerializer(serializers.ModelSerializer):
                 link.clause.delete()
             instance.clause_links.all().delete()
             for i, c in enumerate(clauses_data):
+                c = dict(c)
+                c.pop("id", None)
+                c["id"] = get_next_id("CL", ContractClause)
                 clause = ContractClause.objects.create(**c)
                 ContractClauseLink.objects.create(contract=instance, clause=clause, order=i)
         instance.save()
@@ -333,3 +347,7 @@ class SMSLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = SMSLog
         fields = ["id", "to", "body", "status", "timestamp", "error"]
+
+    def create(self, validated_data):
+        validated_data["id"] = get_next_id("SL", SMSLog)
+        return super().create(validated_data)
