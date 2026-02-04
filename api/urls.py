@@ -10,6 +10,8 @@ from .views import (
     QuotationViewSet,
     VoucherViewSet,
     ContractViewSet,
+    FreelancerViewSet,
+    FreelanceWorkViewSet,
     SMSLogViewSet,
     send_sms,
 )
@@ -20,6 +22,8 @@ router.register(r"settings", AgencySettingsViewSet, basename="agencysettings")
 router.register(r"quotations", QuotationViewSet, basename="quotation")
 router.register(r"vouchers", VoucherViewSet, basename="voucher")
 router.register(r"contracts", ContractViewSet, basename="contract")
+router.register(r"freelancers", FreelancerViewSet, basename="freelancer")
+router.register(r"freelance-works", FreelanceWorkViewSet, basename="freelancework")
 router.register(r"sms-logs", SMSLogViewSet, basename="smslog")
 
 urlpatterns = [

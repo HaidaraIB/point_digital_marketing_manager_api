@@ -130,6 +130,7 @@ class Voucher(models.Model):
         GENERAL = "GENERAL", _("عام")
         VOUCHER = "VOUCHER", _("وصل")
         OWNER_WITHDRAWAL = "OWNER_WITHDRAWAL", _("سحب مالك")
+        FREELANCE = "FREELANCE", _("فري لانس")
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     type = models.CharField(max_length=20, choices=VoucherType.choices)
@@ -192,6 +193,46 @@ class ContractClauseLink(models.Model):
     class Meta:
         db_table = "api_contract_clause_link"
         ordering = ["order"]
+
+
+class Freelancer(models.Model):
+    """Freelancer (photographer/editor) for freelance settlement."""
+
+    class Role(models.TextChoices):
+        PHOTOGRAPHER = "PHOTOGRAPHER", _("مصور")
+        EDITOR = "EDITOR", _("مونتير")
+
+    id = models.CharField(primary_key=True, max_length=36, editable=False)
+    name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=50)
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.PHOTOGRAPHER)
+
+    class Meta:
+        db_table = "api_freelancer"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class FreelanceWork(models.Model):
+    """A single freelance work item (piece) linked to a freelancer."""
+
+    id = models.CharField(primary_key=True, max_length=36, editable=False)
+    freelancer = models.ForeignKey(Freelancer, on_delete=models.CASCADE, related_name="works")
+    description = models.TextField()
+    date = models.CharField(max_length=50)
+    price = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=3, default="IQD")
+    is_paid = models.BooleanField(default=False)
+    payment_id = models.CharField(max_length=36, blank=True)  # voucher id when paid
+
+    class Meta:
+        db_table = "api_freelance_work"
+        ordering = ["-date", "id"]
+
+    def __str__(self):
+        return f"{self.description[:50]} ({self.freelancer.name})"
 
 
 class SMSLog(models.Model):

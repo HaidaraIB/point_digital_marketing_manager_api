@@ -16,6 +16,8 @@ from .models import (
     Contract,
     ContractClause,
     ContractClauseLink,
+    Freelancer,
+    FreelanceWork,
     SMSLog,
 )
 
@@ -116,6 +118,21 @@ class ContractClauseLinkAdmin(admin.ModelAdmin):
     list_filter = ("contract",)
     raw_id_fields = ("contract", "clause")
     ordering = ("contract", "order")
+
+
+@admin.register(Freelancer)
+class FreelancerAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "phone", "role")
+    list_filter = ("role",)
+    search_fields = ("name", "phone")
+
+
+@admin.register(FreelanceWork)
+class FreelanceWorkAdmin(admin.ModelAdmin):
+    list_display = ("id", "freelancer", "description", "date", "price", "currency", "is_paid")
+    list_filter = ("is_paid", "currency")
+    search_fields = ("description",)
+    raw_id_fields = ("freelancer",)
 
 
 @admin.register(SMSLog)

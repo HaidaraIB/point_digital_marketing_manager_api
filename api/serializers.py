@@ -15,6 +15,8 @@ from .models import (
     Contract,
     ContractClause,
     ContractClauseLink,
+    Freelancer,
+    FreelanceWork,
     SMSLog,
 )
 
@@ -337,6 +339,49 @@ class ContractSerializer(serializers.ModelSerializer):
                 ContractClauseLink.objects.create(contract=instance, clause=clause, order=i)
         instance.save()
         return instance
+
+
+# ----- Freelancer -----
+class FreelancerSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    role = serializers.ChoiceField(choices=Freelancer.Role.choices)
+
+    class Meta:
+        model = Freelancer
+        fields = ["id", "name", "phone", "role"]
+
+    def create(self, validated_data):
+        validated_data["id"] = get_next_id("FL", Freelancer)
+        return super().create(validated_data)
+
+
+# ----- Freelance Work -----
+class FreelanceWorkSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    freelancerId = serializers.PrimaryKeyRelatedField(
+        queryset=Freelancer.objects.all(), source="freelancer", write_only=True
+    )
+    isPaid = serializers.BooleanField(source="is_paid", default=False)
+    paymentId = serializers.CharField(source="payment_id", required=False, allow_blank=True)
+
+    class Meta:
+        model = FreelanceWork
+        fields = ["id", "freelancerId", "description", "date", "price", "currency", "isPaid", "paymentId"]
+
+    def create(self, validated_data):
+        validated_data["freelancer"] = validated_data.pop("freelancer")
+        validated_data["is_paid"] = validated_data.get("is_paid", False)
+        validated_data["payment_id"] = validated_data.get("payment_id", "") or ""
+        validated_data["id"] = get_next_id("WK", FreelanceWork)
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["freelancerId"] = str(instance.freelancer_id)
+        rep["price"] = str(instance.price)
+        rep["isPaid"] = instance.is_paid
+        rep["paymentId"] = instance.payment_id or ""
+        return rep
 
 
 # ----- SMS Log -----

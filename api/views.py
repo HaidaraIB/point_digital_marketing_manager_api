@@ -12,6 +12,8 @@ from .models import (
     Quotation,
     Voucher,
     Contract,
+    Freelancer,
+    FreelanceWork,
     SMSLog,
 )
 from .serializers import (
@@ -21,6 +23,8 @@ from .serializers import (
     QuotationSerializer,
     VoucherSerializer,
     ContractSerializer,
+    FreelancerSerializer,
+    FreelanceWorkSerializer,
     SMSLogSerializer,
 )
 from .permissions import (
@@ -124,6 +128,37 @@ class ContractViewSet(viewsets.ModelViewSet):
     queryset = Contract.objects.all()
     permission_classes = [IsAuthenticated, IsAccountantReadAddOrAdmin]
     serializer_class = ContractSerializer
+
+
+class FreelancerViewSet(viewsets.ModelViewSet):
+    """Accountant: read + add. Admin: full CRUD. Freelancers (photographer/editor)."""
+
+    queryset = Freelancer.objects.all()
+    permission_classes = [IsAuthenticated, IsAccountantReadAddOrAdmin]
+    serializer_class = FreelancerSerializer
+
+
+class FreelanceWorkViewSet(viewsets.ModelViewSet):
+    """Accountant: read + add. Admin: full CRUD. Mark works as paid via action."""
+
+    queryset = FreelanceWork.objects.all()
+    permission_classes = [IsAuthenticated, IsAccountantReadAddOrAdmin]
+    serializer_class = FreelanceWorkSerializer
+
+    @action(detail=False, methods=["post"], url_path="mark-paid")
+    def mark_paid(self, request):
+        """Body: { workIds: string[], voucherId: string }. Mark given works as paid."""
+        work_ids = request.data.get("workIds") or []
+        voucher_id = (request.data.get("voucherId") or "").strip()
+        if not work_ids or not voucher_id:
+            return Response(
+                {"detail": "workIds and voucherId are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        updated = FreelanceWork.objects.filter(id__in=work_ids).update(
+            is_paid=True, payment_id=voucher_id
+        )
+        return Response({"updated": updated})
 
 
 class SMSLogViewSet(viewsets.ModelViewSet):
