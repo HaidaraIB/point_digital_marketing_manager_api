@@ -96,6 +96,10 @@ class Quotation(models.Model):
     currency = models.CharField(max_length=3, default="IQD")  # IQD / USD
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     note = models.TextField(blank=True)
+    exchange_rate = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="سعر الصرف عند الإصدار (للعرض فقط، لا يُعدّل لاحقاً)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -141,6 +145,10 @@ class Voucher(models.Model):
     party_name = models.CharField(max_length=255)
     party_phone = models.CharField(max_length=50, blank=True)
     category = models.CharField(max_length=20, choices=Category.choices, blank=True)
+    exchange_rate = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="سعر الصرف عند الإصدار (للعرض فقط، لا يُعدّل لاحقاً)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

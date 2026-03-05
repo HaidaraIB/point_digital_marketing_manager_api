@@ -30,6 +30,7 @@ from .serializers import (
 from .permissions import (
     IsAdminUser,
     IsAccountantReadAddOrAdmin,
+    IsAuthenticatedReadOnlyOrAdmin,
     _is_accountant,
 )
 
@@ -66,10 +67,10 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class AgencySettingsViewSet(viewsets.ModelViewSet):
-    """CRUD for agency settings. Only ADMIN can access (read/write). Accountant has no access."""
+    """Read (list/retrieve) for any authenticated user (so accountant sees logo/name). Write (create/update/delete) for ADMIN only."""
 
     queryset = AgencySettings.objects.all()
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAuthenticatedReadOnlyOrAdmin]
     serializer_class = AgencySettingsSerializer
 
 

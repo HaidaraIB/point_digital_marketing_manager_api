@@ -177,14 +177,19 @@ class QuotationSerializer(serializers.ModelSerializer):
     items = QuotationItemSerializer(many=True, required=False)
     currency = serializers.CharField(required=False, default="IQD")
     status = serializers.ChoiceField(choices=Quotation.Status.choices)
+    exchangeRate = serializers.DecimalField(
+        max_digits=14, decimal_places=2, source="exchange_rate", required=False, allow_null=True
+    )
 
     class Meta:
         model = Quotation
-        fields = ["id", "clientName", "clientPhone", "date", "items", "total", "currency", "status", "note"]
+        fields = ["id", "clientName", "clientPhone", "date", "items", "total", "currency", "status", "note", "exchangeRate"]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["items"] = QuotationItemSerializer(instance.items.all().order_by("id"), many=True).data
+        if instance.exchange_rate is not None:
+            rep["exchangeRate"] = float(instance.exchange_rate)
         return rep
 
     def create(self, validated_data):
@@ -192,6 +197,9 @@ class QuotationSerializer(serializers.ModelSerializer):
         validated_data["client_name"] = validated_data.pop("client_name")
         validated_data["client_phone"] = validated_data.pop("client_phone", "") or ""
         validated_data.setdefault("currency", "IQD")
+        if validated_data.get("exchange_rate") is None:
+            settings = AgencySettings.objects.first()
+            validated_data["exchange_rate"] = settings.exchange_rate if settings else 1500
         validated_data["id"] = get_next_id("QT", Quotation)
         quotation = Quotation.objects.create(**validated_data)
         total = 0
@@ -206,6 +214,7 @@ class QuotationSerializer(serializers.ModelSerializer):
         return quotation
 
     def update(self, instance, validated_data):
+        validated_data.pop("exchange_rate", None)
         items_data = validated_data.pop("items", None)
         if "client_name" in validated_data:
             instance.client_name = validated_data.pop("client_name")
@@ -235,20 +244,33 @@ class VoucherSerializer(serializers.ModelSerializer):
     partyPhone = serializers.CharField(source="party_phone", required=False, allow_blank=True)
     currency = serializers.CharField(required=False, default="IQD")
     category = serializers.CharField(required=False, allow_blank=True)
+    exchangeRate = serializers.DecimalField(
+        max_digits=14, decimal_places=2, source="exchange_rate", required=False, allow_null=True
+    )
 
     class Meta:
         model = Voucher
-        fields = ["id", "type", "amount", "currency", "date", "description", "partyName", "partyPhone", "category"]
+        fields = ["id", "type", "amount", "currency", "date", "description", "partyName", "partyPhone", "category", "exchangeRate"]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        if instance.exchange_rate is not None:
+            rep["exchangeRate"] = float(instance.exchange_rate)
+        return rep
 
     def create(self, validated_data):
         validated_data["party_name"] = validated_data.pop("party_name")
         validated_data["party_phone"] = validated_data.pop("party_phone", "") or ""
         validated_data.setdefault("currency", "IQD")
         validated_data.setdefault("category", "")
+        if validated_data.get("exchange_rate") is None:
+            settings = AgencySettings.objects.first()
+            validated_data["exchange_rate"] = settings.exchange_rate if settings else 1500
         validated_data["id"] = get_next_id("VC", Voucher)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        validated_data.pop("exchange_rate", None)
         if "party_name" in validated_data:
             instance.party_name = validated_data.pop("party_name")
         if "party_phone" in validated_data:
