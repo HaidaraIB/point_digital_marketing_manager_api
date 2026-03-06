@@ -84,9 +84,10 @@ class Quotation(models.Model):
     """Quotation: client, date, items, total, status, note (v4: client_phone, currency)."""
 
     class Status(models.TextChoices):
-        PENDING = "PENDING", _("Pending")
-        ACCEPTED = "ACCEPTED", _("Accepted")
-        REJECTED = "REJECTED", _("Rejected")
+        PENDING = "PENDING", _("معلق")
+        SUBMITTED = "SUBMITTED", _("تم الإرسال")
+        ACCEPTED = "ACCEPTED", _("موافق عليه")
+        REJECTED = "REJECTED", _("مرفوض")
 
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     client_name = models.CharField(max_length=255)
