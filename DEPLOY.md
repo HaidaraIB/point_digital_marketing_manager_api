@@ -91,6 +91,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(50))"
 ```bash
 cd /var/www/point_digital_marketing_manager_api
 source .venv/bin/activate
+python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser   # إن احتجت مستخدماً للوحة الإدارة
 python manage.py collectstatic --noinput   # مطلوب لعرض لوحة الإدارة (admin) بشكل صحيح
