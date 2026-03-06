@@ -244,6 +244,7 @@ cd /var/www/point_digital_marketing_manager_api
 source .venv/bin/activate
 git pull   # إن كنت تستخدم Git
 pip install -r requirements.txt
+python manage.py makemigrations
 python manage.py migrate
 python manage.py collectstatic --noinput   # إن أضفت/عدّلت تطبيقات تستخدم ملفات ثابتة
 sudo systemctl restart point_digital_marketing_manager_api
