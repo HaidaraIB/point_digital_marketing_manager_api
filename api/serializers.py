@@ -18,6 +18,7 @@ from .models import (
     Freelancer,
     FreelanceWork,
     SMSLog,
+    MonthlyOpeningBalance,
 )
 
 User = get_user_model()
@@ -167,7 +168,7 @@ class QuotationItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuotationItem
-        fields = ["id", "description", "price", "quantity", "currency"]
+        fields = ["id", "description", "details", "price", "quantity", "currency"]
 
 
 class QuotationSerializer(serializers.ModelSerializer):
@@ -234,6 +235,19 @@ class QuotationSerializer(serializers.ModelSerializer):
             instance.total = total
         instance.save()
         return instance
+
+
+# ----- Monthly opening balance (cash carryover) -----
+class MonthlyOpeningBalanceSerializer(serializers.ModelSerializer):
+    yearMonth = serializers.CharField(source="year_month", read_only=True)
+    openingIqd = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MonthlyOpeningBalance
+        fields = ["yearMonth", "openingIqd"]
+
+    def get_openingIqd(self, obj):
+        return float(obj.opening_iqd)
 
 
 # ----- Voucher -----

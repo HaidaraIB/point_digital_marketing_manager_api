@@ -15,6 +15,7 @@ from .models import (
     Freelancer,
     FreelanceWork,
     SMSLog,
+    MonthlyOpeningBalance,
 )
 from .serializers import (
     UserSerializer,
@@ -26,6 +27,7 @@ from .serializers import (
     FreelancerSerializer,
     FreelanceWorkSerializer,
     SMSLogSerializer,
+    MonthlyOpeningBalanceSerializer,
 )
 from .permissions import (
     IsAdminUser,
@@ -33,6 +35,7 @@ from .permissions import (
     IsAuthenticatedReadOnlyOrAdmin,
     _is_accountant,
 )
+from .monthly_balance import rebuild_monthly_opening_balances
 
 User = get_user_model()
 
@@ -99,6 +102,17 @@ class QuotationViewSet(viewsets.ModelViewSet):
         quotation.save()
         serializer = self.get_serializer(quotation)
         return Response(serializer.data)
+
+
+class MonthlyOpeningBalanceViewSet(viewsets.ReadOnlyModelViewSet):
+    """Persisted opening IQD balance per month (carryover from previous month's closing)."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = MonthlyOpeningBalanceSerializer
+
+    def get_queryset(self):
+        rebuild_monthly_opening_balances()
+        return MonthlyOpeningBalance.objects.all().order_by("year_month")
 
 
 class VoucherViewSet(viewsets.ModelViewSet):

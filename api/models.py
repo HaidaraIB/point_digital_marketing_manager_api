@@ -114,6 +114,7 @@ class QuotationItem(models.Model):
     id = models.CharField(primary_key=True, max_length=36, editable=False, default=uuid.uuid4)
     quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name="items")
     description = models.TextField()
+    details = models.TextField(blank=True)
     price = models.DecimalField(max_digits=14, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
     currency = models.CharField(max_length=3, blank=True, default="")
@@ -155,6 +156,20 @@ class Voucher(models.Model):
     class Meta:
         db_table = "api_voucher"
         ordering = ["-created_at"]
+
+
+class MonthlyOpeningBalance(models.Model):
+    """Opening cash balance in IQD for a calendar month (YYYY-MM); equals prior month closing."""
+
+    year_month = models.CharField(max_length=7, unique=True, db_index=True)
+    opening_iqd = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = "api_monthly_opening_balance"
+        ordering = ["year_month"]
+
+    def __str__(self):
+        return f"{self.year_month}: {self.opening_iqd}"
 
 
 class ContractClause(models.Model):

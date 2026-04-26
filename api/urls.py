@@ -13,6 +13,7 @@ from .views import (
     FreelancerViewSet,
     FreelanceWorkViewSet,
     SMSLogViewSet,
+    MonthlyOpeningBalanceViewSet,
     send_sms,
 )
 
@@ -25,6 +26,11 @@ router.register(r"contracts", ContractViewSet, basename="contract")
 router.register(r"freelancers", FreelancerViewSet, basename="freelancer")
 router.register(r"freelance-works", FreelanceWorkViewSet, basename="freelancework")
 router.register(r"sms-logs", SMSLogViewSet, basename="smslog")
+router.register(
+    r"monthly-opening-balances",
+    MonthlyOpeningBalanceViewSet,
+    basename="monthlyopeningbalance",
+)
 
 urlpatterns = [
     path("send-sms/", send_sms),
