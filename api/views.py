@@ -4,7 +4,7 @@ ViewSets for Point Digital Marketing Manager API.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 
 from .models import (
@@ -38,6 +38,13 @@ from .permissions import (
 from .monthly_balance import rebuild_monthly_opening_balances
 
 User = get_user_model()
+
+
+@api_view(["GET", "HEAD"])
+@permission_classes([AllowAny])
+def health_check(request):
+    """Lightweight liveness probe (X-API-Key only; no JWT). Used by frontend connectivity checks."""
+    return Response({"status": "ok"})
 
 
 class UserViewSet(viewsets.ModelViewSet):

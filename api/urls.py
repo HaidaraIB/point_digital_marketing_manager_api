@@ -15,6 +15,7 @@ from .views import (
     SMSLogViewSet,
     MonthlyOpeningBalanceViewSet,
     send_sms,
+    health_check,
 )
 
 router = DefaultRouter()
@@ -33,6 +34,7 @@ router.register(
 )
 
 urlpatterns = [
+    path("health/", health_check),
     path("send-sms/", send_sms),
     path("", include(router.urls)),
 ]
